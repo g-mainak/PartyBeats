@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.2.2/css/bootstrap-combined.min.css" rel="stylesheet">
+	<style type="text/css">
+		body 
+		{
+			background-image:url('http://fc05.deviantart.net/fs71/i/2012/203/8/8/stream_of_light_by_javierocasio-d1i9obp.png');
+			 background-size: 100% 100%;
+			 color: white;
+		}
+	</style>
+</head>
+
+<div class="navbar navbar-inverse">
+	<div class="navbar-inner">
+		<a class="brand" href="/home">PartyBeats</a>
+		<ul class="nav pull-right">
+			<li><a href="#">CS434</a></li>
+		</ul>
+		<form id="partyName" class="navbar-form pull-right">
+			Party Name
+		    <input type="text" class="span2" id="pName">
+		    <button type="submit" class="btn">Submit</button>
+    	</form>
+	</div>
+</div>
+<body>
+	<div class="container">
+		<div class="span8 offset2">
+			<h2 id="currentPlayer">Now Playing</h2>
+			<div id="ytapiplayer">
+				You need Flash player 8+ and JavaScript enabled to view this video.
+			</div>
+		</div>
+
+		<div class="span8 offset2">
+			<h2>Up Next!</h2>
+			<table class="table">
+				<thead>
+				</thead>
+				<tbody id="songList">
+				</tbody>
+			</table>
+		</div>
+	</div>
+</body>
+</html>
+
+
+
+<script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.2.2/js/bootstrap.min.js"></script>
+<script src="//ajax.googleapis.com/ajax/libs/swfobject/2.2/swfobject.js"></script> 
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>
+<script type="text/javascript">
+
+var obj = null;
+var sortedObj = null;
+
+var jsonUrl = "http://macaw.zoo.cs.yale.edu:10000/"; //"http://localhost/json.json";
+$("#partyName").submit( ajaxCall );
+
+function ajaxCall()
+{
+	$.getJSON(
+		jsonUrl+ "getSongs?partyName="+$('#pName').val(),
+		function(json) 
+		{
+			console.log(json);
+			obj = json;
+			sortedObj = obj.songs.sort(function(a,b) 
+							{ 
+								if (a.promotion_number != b.promotion_number)
+									return b.promotion_number - a.promotion_number;
+								else if (a.votes != b.votes)
+									return b.votes - a.votes;
+								else
+									return a.index - b.index;
+							});
+			ytplayer = document.getElementById("myytplayer");
+			ytplayer.loadVideoById(sortedObj[0].url, 5, "large");
+			$('#currentPlayer').text("Now playing: "+sortedObj[0].name.replace(/%20/g," "));
+			currentURL = sortedObj[0].url;
+			currentName = sortedObj[0].name;
+			findAndRemove(sortedObj, "url", currentURL);
+			var v = jsonUrl+"deleteSong?name="+ currentName + "&partyName="+$('#pName').val()+"&deviceID=0";
+			$.getJSON(
+				v,
+				function(json) 
+				{
+					console.log(json);
+				}
+			);
+			$('tr').remove();
+			printJSON(sortedObj);
+		}
+		);
+	setTimeout(ajaxCall,10000); //now that the request is complete, do it again in 10 seconds
+	return false;
+}
+
+function printJSON(json)
+{
+	$('<tr><th >Rank</th><th >Name</th><th >Votes</th></tr>').appendTo('thead');
+	$(json).each(function(attr, val)
+	{
+		$('<tr id="' + attr + '"></tr>').appendTo('#songList');
+		$('<td></td>').text(attr+1).appendTo('#'+attr);
+		$('<td></td>').text(val.name.replace(/%20/g," ")).appendTo('#'+attr);
+		if(val.promotion_number)
+			$('<td></td>').text("Host's Choice").appendTo('#'+attr);
+		else
+			$('<td></td>').text(val.votes).appendTo('#'+attr);
+	});
+}
+
+function findAndRemove(array, property, value) 
+{
+	$.each(array, function(index, result) 
+	{
+		if(result[property] == value) 
+		{
+          //Remove from array
+          array.splice(index, 1);
+          return false;
+      	}    
+  	});
+  	return true;
+}
+
+var params = { allowScriptAccess: "always", allowfullscreen: 'true'};
+var atts = { id: "myytplayer" };
+var video_id = "SPJQH9wBA4g";
+swfobject.embedSWF("http://www.youtube.com/v/"+video_id+"?enablejsapi=1&playerapiid=ytplayer&version=3",
+	"ytapiplayer", "800", "600", "8", null, null, params, atts);
+
+function onYouTubePlayerReady(playerId) {
+	ytplayer = document.getElementById("myytplayer");
+	ytplayer.addEventListener("onStateChange", "onytplayerStateChange");
+	if (sortedObj)
+		printJSON(sortedObj);
+}
+
+var currentURL = null, currentName = null;
+function onytplayerStateChange(newState) {
+	if (newState == 0)
+	{
+		ytplayer = document.getElementById("myytplayer");
+		ytplayer.loadVideoById(sortedObj[0].url, 5, "large");
+		$('#currentPlayer').text("Now playing: "+sortedObj[0].name.replace(/%20/g," "));
+		currentURL = sortedObj[0].url;
+		currentName = sortedObj[0].name;
+		if (currentURL!=null)
+		{
+			findAndRemove(sortedObj, "url", currentURL);
+			console.log("LD");
+			var v = jsonUrl+"deleteSong?name="+ currentName + "&partyName="+$('#pName').val()+"&deviceID=0";
+			$.getJSON(
+				v,
+				function(json) 
+				{
+					console.log(json);
+				}
+			);
+			console.log("LU"+v);
+		}
+		$('tr').remove();
+		printJSON(sortedObj);
+	}
+}
+</script>
